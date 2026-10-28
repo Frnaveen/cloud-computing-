@@ -1,0 +1,80 @@
+name: Cloud Pipeline CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-validate:
+    name: Run Automated Tests & Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Code Syntax & Lint Check
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv,venv
+          python -m py_compile app.py lambda_function.py aws_manager.py ml/train_models.py scripts/compute_report_numbers.py
+
+      - name: Run Pytest Test Suite
+        run: |
+          pytest tests/ -v --junitxml=test-results.xml
+
+      - name: Verify Docker Container Build
+        run: |
+          docker build -t food-waste-analysis-dashboard:ci .
+
+  deploy:
+    name: Deploy to AWS (Lambda, ECR, App Runner)
+    needs: test-and-validate
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'ap-south-1' }}
+
+      - name: Package & Update AWS Lambda
+        run: |
+          zip lambda_deployment_package.zip lambda_function.py
+          aws lambda update-function-code \
+            --function-name food-waste-validator \
+            --zip-file fileb://lambda_deployment_package.zip || echo "Lambda update skipped (function not yet provisioned)"
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        continue-on-error: true
+
+      - name: Build and Push Docker Image to ECR
+        if: steps.login-ecr.outcome == 'success'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: food-waste-dashboard
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG

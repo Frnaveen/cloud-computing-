@@ -1,0 +1,24 @@
+{
+  "best_model": "Random Forest",
+  "models": {
+    "Linear Regression": {
+      "MAE": 3.704,
+      "RMSE": 4.577,
+      "R2": 0.5098
+    },
+    "Random Forest": {
+      "MAE": 3.512,
+      "RMSE": 4.393,
+      "R2": 0.5483
+    },
+    "Gradient Boosting": {
+      "MAE": 3.503,
+      "RMSE": 4.485,
+      "R2": 0.5293
+    }
+  },
+  "dataset_size": 630,
+  "train_size": 504,
+  "test_size": 126,
+  "target": "wasted_qty_kg"
+}

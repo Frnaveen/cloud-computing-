@@ -1,0 +1,34 @@
+# Environment and secret files
+.env
+.env.*
+*.pem
+*.key
+credentials
+config
+.aws/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Testing and IDE
+.pytest_cache/
+.coverage
+htmlcov/
+test-results.xml
+*.xml
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
